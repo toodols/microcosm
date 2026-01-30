@@ -314,6 +314,8 @@
 
 			let playerColor = 1;
 			let gameState = { cells: {}, teamSize: 2, gridSize: 4 };
+			let participants = [];
+			let showMoves = false;
 			let playerMovesState = {};
 			let isLocked = false;
 			let currentSalt = "";
@@ -443,10 +445,10 @@
 					div.className = "enemy-box";
 					div.style.borderColor = meta.ui;
 					div.innerHTML = `
-                        <div class="section-title" style="color:${meta.ui}">${meta.name} (P${i}) DATA</div>
-                        <textarea id="enemy-hash-${i}" rows="1" placeholder="Paste Hash..."></textarea>
-                        <textarea id="enemy-json-${i}" rows="3" placeholder="Paste JSON..."></textarea>
-                    `;
+			                     <div class="section-title" style="color:${meta.ui}">${meta.name} (P${i}) DATA</div>
+			                     <textarea id="enemy-hash-${i}" rows="1" placeholder="Paste Hash..."></textarea>
+			                     <textarea id="enemy-json-${i}" rows="3" placeholder="Paste JSON..."></textarea>
+			                 `;
 					container.appendChild(div);
 				}
 			}
@@ -481,7 +483,7 @@
 			/** --- Combat Logic with Pruning --- */
 
 			async function resolveCombat() {
-				const participants = [];
+				participants = [];
 				// Add current player
 				participants.push({
 					playerColor: playerColor,
@@ -511,6 +513,11 @@
 					participants.push(data);
 				}
 
+				showMoves = true;
+				draw();
+
+				await new Promise((resolve) => setTimeout(resolve, 2000));
+
 				// 1. Resolve Move Conflicts (Highest move count wins the cell)
 				Object.keys(gameState.cells).forEach((key) => {
 					let maxMoves = -1;
@@ -534,6 +541,10 @@
 					// Reset moves for next turn
 					playerMovesState[key].value = 0;
 				});
+
+				showMoves = false;
+				draw();
+				await new Promise((resolve) => setTimeout(resolve, 2000));
 
 				// 2. Pruning Phase: Remove disconnected smaller components
 				pruneDisconnectedComponents();
@@ -748,13 +759,46 @@
 						ctx.stroke();
 					}
 
-					const val = playerMovesState[key]?.value || 0;
-					if (val > 0) {
-						ctx.fillStyle = "white";
-						ctx.font = `bold ${size * 0.5}px sans-serif`;
-						ctx.textAlign = "center";
-						ctx.textBaseline = "middle";
-						ctx.fillText(val, x, y);
+					ctx.lineWidth = 1;
+
+					if (showMoves) {
+						if (participants.every((p) => p.moves[key].value === 0))
+							return;
+						for (let i = 0; i < participants.length; i++) {
+							ctx.fillStyle =
+								TEAM_METADATA[
+									participants[i].playerColor
+								].color;
+							ctx.strokeStyle = "#000";
+							ctx.font = `bold ${size * 0.25}px sans-serif`;
+							ctx.textAlign = "center";
+							ctx.textBaseline = "middle";
+							ctx.fillText(
+								participants[i].moves[key].value,
+								x -
+									(participants.length / 2) * size * 0.25 +
+									i * size * 0.25,
+								y,
+							);
+							ctx.strokeText(
+								participants[i].moves[key].value,
+								x -
+									(participants.length / 2) * size * 0.25 +
+									i * size * 0.25,
+								y,
+							);
+						}
+					} else {
+						const val = playerMovesState[key]?.value || 0;
+						if (val > 0) {
+							ctx.fillStyle = TEAM_METADATA[playerColor].color;
+							ctx.strokeStyle = "#000";
+							ctx.font = `bold ${size * 0.5}px sans-serif`;
+							ctx.textAlign = "center";
+							ctx.textBaseline = "middle";
+							ctx.fillText(val, x, y);
+							ctx.strokeText(val, x, y);
+						}
 					}
 				});
 			}
