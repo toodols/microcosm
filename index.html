@@ -725,7 +725,14 @@
 				// alert("Link copied for Player " + targetTeam);
 			}
 			async function copyHash() {
-				const hash = await getGameStateHash();
+				const submission = {
+					expectGameHash: await getGameStateHash(),
+					playerColor: playerColor,
+					moves: playerMovesState,
+					salt: currentSalt,
+				};
+				const json = JSON.stringify(submission);
+				const hash = await hashString(json);
 				navigator.clipboard.writeText(hash);
 
 				const copyButton = document.getElementById("copy-hash");
