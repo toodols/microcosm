@@ -1,5 +1,5 @@
 # Microcosm
-![image.png]
+![image](image.png)
 
 A simple p2p simultaneous strategy game made in like 3 hours with Gemini (took about 4 or 5 prompts)
 
