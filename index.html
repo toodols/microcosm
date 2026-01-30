@@ -1,0 +1,834 @@
+<!doctype html>
+<html>
+	<head>
+		<title>Microcosm</title>
+		<style>
+			body {
+				margin: 0;
+				display: flex;
+				background: #0f0f0f;
+				color: #eee;
+				font-family: "Inter", sans-serif;
+				height: 100vh;
+				overflow: hidden;
+			}
+
+			/* Sidebar */
+			aside {
+				min-width: 350px;
+				width: 350px;
+				background: #161616;
+				border-right: 1px solid #333;
+				padding: 20px;
+				display: flex;
+				flex-direction: column;
+				gap: 15px;
+				overflow-y: auto;
+			}
+			.help-menu {
+				background: #1e1e1e;
+				padding: 12px;
+				border-radius: 8px;
+				font-size: 0.85rem;
+				line-height: 1.4;
+				color: #bbb;
+				border: 1px solid #333;
+			}
+			.help-menu b {
+				color: #3d5afe;
+			}
+
+			.section-title {
+				font-size: 0.7rem;
+				text-transform: uppercase;
+				color: #666;
+				letter-spacing: 1px;
+				margin-bottom: 4px;
+			}
+			textarea {
+				width: 100%;
+				background: #000;
+				color: rgb(119, 119, 119);
+				border: 1px solid #333;
+				font-family: monospace;
+				font-size: 0.7rem;
+				padding: 8px;
+				resize: none;
+				border-radius: 4px;
+				box-sizing: border-box;
+			}
+			.read-only {
+				background: #0a0a0a;
+				color: #888;
+				cursor: not-allowed;
+			}
+
+			/* Main UI */
+			main {
+				flex: 1;
+				position: relative;
+				background: radial-gradient(
+					circle at center,
+					#1a1a1a 0%,
+					#0f0f0f 100%
+				);
+			}
+			#overlay {
+				position: absolute;
+				inset: 0;
+				background: rgba(0, 0, 0, 0.9);
+				display: flex;
+				flex-direction: column;
+				justify-content: center;
+				align-items: center;
+				z-index: 100;
+			}
+			#ui-stats {
+				position: absolute;
+				top: 20px;
+				left: 20px;
+				pointer-events: none;
+			}
+			#controls {
+				position: absolute;
+				bottom: 20px;
+				left: 50%;
+				transform: translateX(-50%);
+				display: flex;
+				gap: 10px;
+			}
+
+			.card {
+				background: rgba(20, 20, 20, 0.9);
+				padding: 10px 15px;
+				border-radius: 8px;
+				border: 1px solid #333;
+				margin-bottom: 10px;
+			}
+
+			button {
+				padding: 10px 18px;
+				cursor: pointer;
+				background: #3d5afe;
+				color: white;
+				border: none;
+				border-radius: 4px;
+				font-weight: bold;
+				transition: 0.2s;
+			}
+			button:hover {
+				background: #536dfe;
+			}
+			button.locked {
+				background: #f44336;
+			}
+			button.secondary {
+				background: #333;
+			}
+			button.copied {
+				background: #3d5afe;
+			}
+			button.danger {
+				background: #424242;
+				font-size: 0.7rem;
+				padding: 5px;
+			}
+
+			canvas {
+				display: block;
+			}
+			input[type="number"],
+			select {
+				background: #222;
+				border: 1px solid #444;
+				color: white;
+				padding: 8px;
+				border-radius: 4px;
+			}
+			.enemy-box {
+				border-left: 4px solid #333;
+				padding-left: 10px;
+				margin-bottom: 15px;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="overlay">
+			<h1 style="margin-bottom: 5px">Microcosm</h1>
+			<p style="color: #888; margin-bottom: 30px">
+				Set your board dimensions and teams
+			</p>
+			<div
+				style="
+					display: flex;
+					flex-direction: column;
+					gap: 15px;
+					margin-bottom: 30px;
+					align-items: flex-end;
+				"
+			>
+				<label
+					>Grid Size:
+					<input
+						type="number"
+						id="setup-size"
+						value="4"
+						min="2"
+						max="10"
+				/></label>
+				<label
+					>Total Teams:
+					<select id="setup-team-size">
+						<option value="2">2 Players</option>
+						<option value="3">3 Players</option>
+						<option value="4">4 Players</option>
+					</select>
+				</label>
+				<label
+					>Your Team:
+					<select id="setup-team">
+						<option value="1">Red (P1)</option>
+						<option value="2">Blue (P2)</option>
+						<option value="3">Green (P3)</option>
+						<option value="4">Yellow (P4)</option>
+					</select>
+				</label>
+			</div>
+			<button
+				onclick="launchNewGame()"
+				style="padding: 15px 40px; font-size: 1.1rem"
+			>
+				Launch Game
+			</button>
+		</div>
+
+		<aside>
+			<h1>Microcosm</h1>
+			<button onclick="reset()">New Game</button>
+
+			<div class="help-menu">
+				<b>Commitment Phase:</b> Everyone locks moves and swaps
+				<b>Hashes</b>.<br />
+				<b>Reveal Phase:</b> Everyone swaps <b>JSON</b>.<br />
+				<b>Resolve:</b> Paste all enemy data and resolve combat.
+			</div>
+
+			<div class="card">
+				<div class="section-title">Share Link</div>
+				<div style="display: flex; gap: 5px">
+					<select
+						id="copy-team-select"
+						style="flex: 1; font-size: 0.7rem"
+					>
+						<option value="1">For Team 1</option>
+						<option value="2">For Team 2</option>
+						<option value="3">For Team 3</option>
+						<option value="4">For Team 4</option>
+					</select>
+					<button
+						class="secondary"
+						style="font-size: 0.7rem"
+						id="copy-link"
+						onclick="copyEnemyUrl()"
+					>
+						Copy
+					</button>
+				</div>
+			</div>
+
+			<div>
+				<div class="section-title">Your Hash</div>
+				<textarea
+					id="my-hash"
+					class="read-only"
+					rows="1"
+					readonly
+				></textarea>
+			</div>
+			<div>
+				<div class="section-title">Your MoveSubmission</div>
+				<textarea
+					id="my-json"
+					class="read-only"
+					rows="4"
+					readonly
+				></textarea>
+			</div>
+
+			<hr style="border: 0; border-top: 1px solid #333; margin: 10px 0" />
+
+			<div
+				style="
+					display: flex;
+					justify-content: space-between;
+					align-items: flex-end;
+				"
+			>
+				<div class="section-title">Resolution</div>
+				<button class="danger" onclick="clearEnemyInputs()">
+					Clear All
+				</button>
+			</div>
+
+			<div id="enemy-inputs-container"></div>
+
+			<button onclick="resolveCombat()">Resolve Combat</button>
+		</aside>
+
+		<main>
+			<div id="ui-stats">
+				<div class="card">
+					<div class="section-title">Team</div>
+					<div
+						id="p-team"
+						style="font-weight: bold; font-size: 1.2rem"
+					>
+						-
+					</div>
+				</div>
+				<div class="card">
+					<div class="section-title">Moves Available</div>
+					<div style="font-weight: bold; font-size: 1.2rem">
+						<span id="r-moves">0</span> /
+						<span id="t-moves">0</span>
+					</div>
+				</div>
+			</div>
+
+			<div id="controls">
+				<button id="lock-btn" onclick="toggleLock()">Lock Moves</button>
+			</div>
+
+			<canvas id="hexCanvas"></canvas>
+		</main>
+
+		<script>
+			/** --- Configuration & Colors --- */
+			const TEAM_METADATA = {
+				0: { name: "Neutral", color: "#1a1a1a", border: "#333" },
+				1: { name: "RED", color: "#b71c1c", ui: "#ff5252" },
+				2: { name: "BLUE", color: "#0d47a1", ui: "#448aff" },
+				3: { name: "GREEN", color: "#1b5e20", ui: "#4caf50" },
+				4: { name: "YELLOW", color: "#fbc02d", ui: "#ffeb3b" },
+			};
+
+			let playerColor = 1;
+			let gameState = { cells: {}, teamSize: 2, gridSize: 4 };
+			let playerMovesState = {};
+			let isLocked = false;
+			let currentSalt = "";
+
+			const canvas = document.getElementById("hexCanvas");
+			const ctx = canvas.getContext("2d");
+			let hoveredHex = null;
+
+			/** --- Core Logic --- */
+
+			async function hashString(str) {
+				const msgBuffer = new TextEncoder().encode(str);
+				const hashBuffer = await crypto.subtle.digest(
+					"SHA-256",
+					msgBuffer,
+				);
+				return Array.from(new Uint8Array(hashBuffer))
+					.map((b) => b.toString(16).padStart(2, "0"))
+					.join("");
+			}
+
+			async function getGameStateHash() {
+				const keys = Object.keys(gameState.cells).sort();
+				const data = keys.map((k) => gameState.cells[k].team);
+				return await hashString(
+					JSON.stringify({
+						data,
+						ts: gameState.teamSize,
+						gs: gameState.gridSize,
+					}),
+				);
+			}
+
+			function parseUrl() {
+				const params = new URLSearchParams(window.location.search);
+				const sz = params.get("sz"),
+					tm = params.get("tm"),
+					ts = params.get("ts"),
+					c = params.get("c");
+				if (!sz || !tm || !ts || !c) return false;
+
+				gameState.gridSize = parseInt(sz);
+				gameState.teamSize = parseInt(ts);
+				playerColor = parseInt(tm);
+
+				gameState.cells = {};
+				c.split("|").forEach((entry) => {
+					const [q, r, t] = entry.split(",").map(Number);
+					gameState.cells[`${q},${r}`] = { team: t };
+					playerMovesState[`${q},${r}`] = { value: 0 };
+				});
+				return true;
+			}
+
+			function updateUrl() {
+				const cellData = Object.keys(gameState.cells)
+					.map((k) => `${k},${gameState.cells[k].team}`)
+					.join("|");
+				const params = new URLSearchParams({
+					sz: gameState.gridSize,
+					tm: playerColor,
+					ts: gameState.teamSize,
+					c: cellData,
+				});
+				window.history.replaceState({}, "", "?" + params.toString());
+			}
+
+			function launchNewGame() {
+				const gs = parseInt(
+					document.getElementById("setup-size").value,
+				);
+				const ts = parseInt(
+					document.getElementById("setup-team-size").value,
+				);
+				playerColor = parseInt(
+					document.getElementById("setup-team").value,
+				);
+
+				gameState = { cells: {}, teamSize: ts, gridSize: gs };
+				playerMovesState = {};
+
+				for (let q = -gs; q <= gs; q++) {
+					let r1 = Math.max(-gs, -q - gs),
+						r2 = Math.min(gs, -q + gs);
+					for (let r = r1; r <= r2; r++) {
+						gameState.cells[`${q},${r}`] = { team: 0 };
+						playerMovesState[`${q},${r}`] = { value: 0 };
+					}
+				}
+
+				// 2 Players: {0,-1}, {0,1}
+				// 3 Players: {0,-1}, {-1,1}, {1,0}
+				// 4 Players: {1,-1}, {1,0}, {0,1}, {0,-1} (balanced enough)
+
+				if (ts === 2) {
+					gameState.cells[`0,-1`].team = 1;
+					gameState.cells[`0,1`].team = 2;
+				}
+				if (ts === 3) {
+					gameState.cells[`0,-1`].team = 1;
+					gameState.cells[`-1,1`].team = 2;
+					gameState.cells[`1,0`].team = 3;
+				}
+				if (ts === 4) {
+					gameState.cells[`1,-1`].team = 1;
+					gameState.cells[`1,0`].team = 2;
+
+					gameState.cells[`-1,1`].team = 3;
+					gameState.cells[`-1,0`].team = 4;
+				}
+				document.getElementById("overlay").style.display = "none";
+				renderEnemyInputs();
+				updateUrl();
+				updateUI();
+				draw();
+			}
+
+			function renderEnemyInputs() {
+				const container = document.getElementById(
+					"enemy-inputs-container",
+				);
+				container.innerHTML = "";
+				for (let i = 1; i <= gameState.teamSize; i++) {
+					if (i === playerColor) continue;
+					const meta = TEAM_METADATA[i];
+					const div = document.createElement("div");
+					div.className = "enemy-box";
+					div.style.borderColor = meta.ui;
+					div.innerHTML = `
+                        <div class="section-title" style="color:${meta.ui}">${meta.name} (P${i}) DATA</div>
+                        <textarea id="enemy-hash-${i}" rows="1" placeholder="Paste Hash..."></textarea>
+                        <textarea id="enemy-json-${i}" rows="3" placeholder="Paste JSON..."></textarea>
+                    `;
+					container.appendChild(div);
+				}
+			}
+
+			/** --- Combat Logic --- */
+
+			async function toggleLock() {
+				isLocked = !isLocked;
+				const btn = document.getElementById("lock-btn");
+				btn.textContent = isLocked ? "Unlock Moves" : "Lock Moves";
+				btn.className = isLocked ? "locked" : "";
+
+				if (isLocked) {
+					currentSalt = crypto.randomUUID();
+					const submission = {
+						expectGameHash: await getGameStateHash(),
+						playerColor: playerColor,
+						moves: playerMovesState,
+						salt: currentSalt,
+					};
+					const json = JSON.stringify(submission);
+					document.getElementById("my-json").value = json;
+					document.getElementById("my-hash").value =
+						await hashString(json);
+				} else {
+					document.getElementById("my-json").value = "";
+					document.getElementById("my-hash").value = "";
+				}
+				draw();
+			}
+
+			/** --- Combat Logic with Pruning --- */
+
+			async function resolveCombat() {
+				const participants = [];
+				// Add current player
+				participants.push({
+					playerColor: playerColor,
+					moves: JSON.parse(JSON.stringify(playerMovesState)),
+				});
+
+				// Validate and add enemies
+				for (let i = 1; i <= gameState.teamSize; i++) {
+					if (i === playerColor) continue;
+					const h = document
+						.getElementById(`enemy-hash-${i}`)
+						.value.trim();
+					const j = document
+						.getElementById(`enemy-json-${i}`)
+						.value.trim();
+					if (!h || !j) return alert(`Missing data for Team ${i}`);
+
+					if ((await hashString(j)) !== h)
+						return alert(`Hash mismatch for Team ${i}`);
+
+					const data = JSON.parse(j);
+					if (data.expectGameHash !== (await getGameStateHash()))
+						return alert(
+							`Sync Error: Team ${i} is on a different turn/state.`,
+						);
+
+					participants.push(data);
+				}
+
+				// 1. Resolve Move Conflicts (Highest move count wins the cell)
+				Object.keys(gameState.cells).forEach((key) => {
+					let maxMoves = -1;
+					let winner = -1;
+					let tie = false;
+
+					participants.forEach((p) => {
+						const m = p.moves[key]?.value || 0;
+						if (m > maxMoves) {
+							maxMoves = m;
+							winner = p.playerColor;
+							tie = false;
+						} else if (m === maxMoves && m > 0) {
+							tie = true;
+						}
+					});
+
+					if (!tie && maxMoves > 0) {
+						gameState.cells[key].team = winner;
+					}
+					// Reset moves for next turn
+					playerMovesState[key].value = 0;
+				});
+
+				// 2. Pruning Phase: Remove disconnected smaller components
+				pruneDisconnectedComponents();
+
+				if (isLocked) await toggleLock();
+				clearEnemyInputs();
+				checkWinCondition();
+				updateUrl();
+				updateUI();
+				draw();
+			}
+
+			function pruneDisconnectedComponents() {
+				const componentsByTeam = connectedComponents();
+
+				Object.keys(componentsByTeam).forEach((teamId) => {
+					const teamsComponents = componentsByTeam[teamId];
+					if (teamsComponents.length <= 1) return;
+
+					// Find the maximum size among this team's components
+					const maxSize = Math.max(
+						...teamsComponents.map((comp) => comp.length),
+					);
+
+					// Prune any component that is smaller than the maximum size
+					teamsComponents.forEach((component) => {
+						if (component.length < maxSize) {
+							component.forEach((cellKey) => {
+								gameState.cells[cellKey].team = 0; // Set to Neutral
+							});
+						}
+					});
+				});
+			}
+
+			function checkWinCondition() {
+				const activeTeams = new Set();
+				Object.values(gameState.cells).forEach((c) => {
+					if (c.team > 0) activeTeams.add(c.team);
+				});
+
+				if (activeTeams.size === 1) {
+					const winnerId = Array.from(activeTeams)[0];
+					alert(
+						`GAME OVER! Team ${TEAM_METADATA[winnerId].name} Wins!`,
+					);
+					reset();
+				}
+			}
+
+			/** --- Updated Utility Algorithm --- */
+
+			function connectedComponents() {
+				const results = {};
+				const visited = new Set();
+				const neighbors = [
+					[1, 0],
+					[1, -1],
+					[0, -1],
+					[-1, 0],
+					[-1, 1],
+					[0, 1],
+				];
+
+				// Initialize results for all possible teams
+				for (let i = 1; i <= gameState.teamSize; i++) results[i] = [];
+
+				Object.keys(gameState.cells).forEach((key) => {
+					const cell = gameState.cells[key];
+					if (cell.team === 0 || visited.has(key)) return;
+
+					const currentTeam = cell.team;
+					const component = [];
+					const queue = [key];
+					visited.add(key);
+
+					while (queue.length > 0) {
+						const currKey = queue.shift();
+						component.push(currKey);
+						const [q, r] = currKey.split(",").map(Number);
+
+						neighbors.forEach(([dq, dr]) => {
+							const nk = `${q + dq},${r + dr}`;
+							if (
+								gameState.cells[nk] &&
+								gameState.cells[nk].team === currentTeam &&
+								!visited.has(nk)
+							) {
+								visited.add(nk);
+								queue.push(nk);
+							}
+						});
+					}
+					results[currentTeam].push(component);
+				});
+				return results;
+			}
+
+			function isAvailable(q, r) {
+				const key = `${q},${r}`;
+				if (gameState.cells[key]?.team === playerColor) return true;
+				const ns = [
+					[1, 0],
+					[1, -1],
+					[0, -1],
+					[-1, 0],
+					[-1, 1],
+					[0, 1],
+				];
+				return ns.some(
+					([dq, dr]) =>
+						gameState.cells[`${q + dq},${r + dr}`]?.team ===
+						playerColor,
+				);
+			}
+
+			function updateUI() {
+				const total = Object.values(gameState.cells).filter(
+					(c) => c.team === playerColor,
+				).length;
+				const spent = Object.values(playerMovesState).reduce(
+					(acc, m) => acc + m.value,
+					0,
+				);
+				const meta = TEAM_METADATA[playerColor];
+
+				document.getElementById("p-team").textContent = meta.name;
+				document.getElementById("p-team").style.color = meta.ui;
+				document.getElementById("t-moves").textContent = total;
+				document.getElementById("r-moves").textContent = total - spent;
+
+				// Sync the "Copy link" dropdown
+				const sel = document.getElementById("copy-team-select");
+				sel.innerHTML = "";
+				for (let i = 1; i <= gameState.teamSize; i++) {
+					const opt = document.createElement("option");
+					opt.value = i;
+					opt.textContent = `For Team ${i} (${TEAM_METADATA[i].name})`;
+					sel.appendChild(opt);
+				}
+			}
+
+			function copyEnemyUrl() {
+				const targetTeam =
+					document.getElementById("copy-team-select").value;
+				const myUrl = new URL(window.location.href);
+				myUrl.searchParams.set("tm", targetTeam);
+				navigator.clipboard.writeText(myUrl.href);
+
+				const copyButton = document.getElementById("copy-link");
+				copyButton.textContent = "Copied!";
+				copyButton.classList.add("copied");
+				setTimeout(() => {
+					copyButton.textContent = "Copy";
+					copyButton.classList.remove("copied");
+				}, 1000);
+				// alert("Link copied for Player " + targetTeam);
+			}
+
+			function reset() {
+				history.replaceState({}, "", window.location.pathname);
+				location.reload();
+			}
+
+			function clearEnemyInputs() {
+				for (let i = 1; i <= 4; i++) {
+					if (document.getElementById(`enemy-hash-${i}`)) {
+						document.getElementById(`enemy-hash-${i}`).value = "";
+						document.getElementById(`enemy-json-${i}`).value = "";
+					}
+				}
+			}
+
+			/** --- Canvas Rendering --- */
+
+			function draw() {
+				canvas.width = canvas.parentElement.clientWidth;
+				canvas.height = canvas.parentElement.clientHeight;
+				const gs = gameState.gridSize;
+				const size = Math.min(
+					(canvas.width - 60) / ((gs * 2 + 1) * 1.5),
+					(canvas.height - 60) / ((gs * 2 + 1) * Math.sqrt(3)),
+				);
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+				Object.keys(gameState.cells).forEach((key) => {
+					const [q, r] = key.split(",").map(Number);
+					const x = size * (1.5 * q) + canvas.width / 2;
+					const y =
+						size * ((Math.sqrt(3) / 2) * q + Math.sqrt(3) * r) +
+						canvas.height / 2;
+
+					ctx.beginPath();
+					for (let i = 0; i < 6; i++)
+						ctx.lineTo(
+							x + (size - 3) * Math.cos((i * Math.PI) / 3),
+							y + (size - 3) * Math.sin((i * Math.PI) / 3),
+						);
+					ctx.closePath();
+
+					const team = gameState.cells[key].team;
+					ctx.fillStyle = TEAM_METADATA[team].color;
+					ctx.fill();
+
+					if (!isLocked && isAvailable(q, r)) {
+						const hovered =
+							hoveredHex?.q === q && hoveredHex?.r === r;
+						ctx.strokeStyle = hovered
+							? "#fff"
+							: "rgba(255,255,255,0.1)";
+						ctx.lineWidth = hovered ? 2 : 1;
+						ctx.stroke();
+					}
+
+					const val = playerMovesState[key]?.value || 0;
+					if (val > 0) {
+						ctx.fillStyle = "white";
+						ctx.font = `bold ${size * 0.5}px sans-serif`;
+						ctx.textAlign = "center";
+						ctx.textBaseline = "middle";
+						ctx.fillText(val, x, y);
+					}
+				});
+			}
+
+			// ... (Input Listeners remain largely same, updated for gameState.cells) ...
+			canvas.addEventListener("mousemove", (e) => {
+				if (isLocked) return;
+				const rect = canvas.getBoundingClientRect();
+				const gs = gameState.gridSize;
+				const size = Math.min(
+					(canvas.width - 60) / ((gs * 2 + 1) * 1.5),
+					(canvas.height - 60) / ((gs * 2 + 1) * Math.sqrt(3)),
+				);
+				const qRaw =
+					((2 / 3) * (e.clientX - rect.left - canvas.width / 2)) /
+					size;
+				const rRaw =
+					((-1 / 3) * (e.clientX - rect.left - canvas.width / 2) +
+						(Math.sqrt(3) / 3) *
+							(e.clientY - rect.top - canvas.height / 2)) /
+					size;
+
+				let q = Math.round(qRaw),
+					r = Math.round(rRaw),
+					s = Math.round(-qRaw - rRaw);
+				if (
+					Math.abs(q - qRaw) > Math.abs(r - rRaw) &&
+					Math.abs(q - qRaw) > Math.abs(s - (-qRaw - rRaw))
+				)
+					q = -r - s;
+				else if (Math.abs(r - rRaw) > Math.abs(s - (-qRaw - rRaw)))
+					r = -q - s;
+
+				if (gameState.cells[`${q},${r}`]) {
+					if (hoveredHex?.q !== q || hoveredHex?.r !== r) {
+						hoveredHex = { q, r };
+						draw();
+					}
+				} else {
+					hoveredHex = null;
+					draw();
+				}
+			});
+
+			canvas.addEventListener("mousedown", (e) => {
+				if (isLocked || !hoveredHex) return;
+				const key = `${hoveredHex.q},${hoveredHex.r}`;
+				if (!isAvailable(hoveredHex.q, hoveredHex.r)) return;
+
+				const total = Object.values(gameState.cells).filter(
+					(c) => c.team === playerColor,
+				).length;
+				const spent = Object.values(playerMovesState).reduce(
+					(acc, m) => acc + m.value,
+					0,
+				);
+
+				if (e.button === 0 && spent < total)
+					playerMovesState[key].value++;
+				else if (e.button === 2 && playerMovesState[key].value > 0)
+					playerMovesState[key].value--;
+				updateUI();
+				draw();
+			});
+
+			canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+			window.addEventListener("resize", draw);
+
+			if (parseUrl()) {
+				document.getElementById("overlay").style.display = "none";
+				renderEnemyInputs();
+				updateUI();
+				draw();
+			}
+		</script>
+	</body>
+</html>
