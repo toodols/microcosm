@@ -150,6 +150,11 @@
 				padding-left: 10px;
 				margin-bottom: 15px;
 			}
+			.input-row {
+				display: flex;
+				gap: 5px;
+				align-items: flex-start;
+			}
 		</style>
 	</head>
 	<body>
@@ -236,23 +241,39 @@
 				</div>
 			</div>
 
-			<div>
-				<div class="section-title">Your Hash</div>
+			<div class="section-title">Your Hash</div>
+			<div class="input-row">
 				<textarea
 					id="my-hash"
 					class="read-only"
 					rows="1"
 					readonly
 				></textarea>
+				<button
+					id="copy-hash"
+					class="secondary"
+					style="font-size: 0.7rem"
+					onclick="copyHash()"
+				>
+					Copy
+				</button>
 			</div>
-			<div>
-				<div class="section-title">Your MoveSubmission</div>
+			<div class="section-title">Your Move JSON</div>
+			<div class="input-row">
 				<textarea
 					id="my-json"
 					class="read-only"
 					rows="4"
 					readonly
 				></textarea>
+				<button
+					id="copy-json"
+					class="secondary"
+					style="font-size: 0.7rem"
+					onclick="copyJson()"
+				>
+					Copy
+				</button>
 			</div>
 
 			<hr style="border: 0; border-top: 1px solid #333; margin: 10px 0" />
@@ -380,7 +401,7 @@
 					ts: gameState.teamSize,
 					c: cellData,
 				});
-				window.history.replaceState({}, "", "?" + params.toString());
+				window.history.pushState({}, "", "?" + params.toString());
 			}
 
 			function launchNewGame() {
@@ -703,9 +724,39 @@
 				}, 1000);
 				// alert("Link copied for Player " + targetTeam);
 			}
+			async function copyHash() {
+				const hash = await getGameStateHash();
+				navigator.clipboard.writeText(hash);
+
+				const copyButton = document.getElementById("copy-hash");
+				copyButton.textContent = "Copied!";
+				copyButton.classList.add("copied");
+				setTimeout(() => {
+					copyButton.textContent = "Copy";
+					copyButton.classList.remove("copied");
+				}, 1000);
+			}
+			async function copyJson() {
+				const submission = {
+					expectGameHash: await getGameStateHash(),
+					playerColor: playerColor,
+					moves: playerMovesState,
+					salt: currentSalt,
+				};
+				const json = JSON.stringify(submission);
+				navigator.clipboard.writeText(json);
+
+				const copyButton = document.getElementById("copy-json");
+				copyButton.textContent = "Copied!";
+				copyButton.classList.add("copied");
+				setTimeout(() => {
+					copyButton.textContent = "Copy";
+					copyButton.classList.remove("copied");
+				}, 1000);
+			}
 
 			function reset() {
-				history.replaceState({}, "", window.location.pathname);
+				history.pushState({}, "", window.location.pathname);
 				location.reload();
 			}
 
